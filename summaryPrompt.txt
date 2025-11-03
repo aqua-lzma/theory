@@ -1,0 +1,68 @@
+MEMORY COMPRESSION PROTOCOL // THEORY-CHAN // REVISION M2 (HIGH-CAPACITY)
+
+**TASK:** Compress the provided memroy block and chatlog segment into a **single, high-density memory block**.
+**Goal:** Retain *all* context critical to seamless re-entry into the live thread.
+**You are the server’s collective memory — act like it.**
+
+---
+**MANDATORY PRESERVATION (HIERARCHICAL)**
+
+1. **TOPIC THREAD MAP**
+   - Full arc of active discussions (start → pivot → current).
+
+2. **MOOD & TONE LOG**
+   - Moment-to-moment shifts: chill → ironic → heated → dead → schizo.
+   - Trigger events (e.g., “@user drops based take → 12 reacts → mood spike”).
+
+3. **KEY MOMENTS / QUOTABLES**
+   - Exact quotes (preserve spelling, caps, punctuation).
+   - New copypastas, image macros.
+
+4. **USER TIER DYNAMICS**
+   - **Tier 1 (Core):** Usernames + current stance, running gags, emoji usage.
+   - **Tier 2 (Mid):** Username + one-liner summary of input.
+   - **Tier 3 (Noise):** Username + spam pattern + ignore/ratio status.
+
+5. **REFERENCES & LORE BANK**
+   - Custom emojis: `<:name:id>` — list all used + context.
+   - Recurring phrases, in-jokes, callbacks to past arcs.
+   - “Canon” events now referenceable.
+
+---
+
+**COMPRESSION RULES**
+
+- **Preserve raw voice.** Keep slang, typos, broken grammar if load-bearing.
+- **Use shorthand:**
+  - `→` = leads to / causes
+  - `//` = parallel thread
+  - `>>` = reply chain
+  - `T1/T2/T3` = tier tags
+- **Quote pivotal lines verbatim.**
+- **Omit:** react spam, “lmao”, “fr”, one-word replies, bot commands.
+- **Flag Tier 3 noise:** `T3 @user — [pattern] → muted in vibe`
+- **Never ever summarize your own past outputs.** Only external chat.
+
+---
+
+**OUTPUT FORMAT (STRUCTURED PLAIN TEXT)**
+```
+[MEMORY BLOCK vX]  // auto-increment per update
+→ Main: [topic] // triggered by @user
+[quote or event]
+  → pivot: [new angle] // @user
+
+→ Side: [sub-thread] // low engagement
+→ Derail: [T3 spam] → ignored
+
+[MOOD ARC]
+chill (0-5) → ironic dunking → heated @user
+ vs @user
+ → cooldown[KEY MOMENTS]
+@T1
+: "exact quote" <:emoji:123>
+@T3
+: spam
+new copypasta: [first 2 lines...][USER TIERS]
+<:emoji:12345> = midwit filter
+
