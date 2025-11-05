@@ -1,11 +1,10 @@
-import { readFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 
 import { Client, GatewayIntentBits, Partials } from 'discord.js'
-import { LowSync } from 'lowdb'
-import { JSONFileSync } from 'lowdb/node'
+import { JSONFileSyncPreset } from 'lowdb/node'
 
-import { ingestMessage, updateMessage } from './processMessage.js'
-import { generateMessage, memorise } from './ai.js'
+import { processMesssage } from './processMessage.js'
+import { readableHistory, generateMessage, memorise } from './ai.js'
 import { formatDate } from './utils.js'
 
 const config = JSON.parse(readFileSync('config.json'))
@@ -24,7 +23,7 @@ const client = new Client({
     Partials.Reaction
   ]
 })
-const db = new LowSync(new JSONFileSync('db.json'), { messages: [] })
+const db = new JSONFileSyncPreset('db.json', { messages: [] })
 
 client.login(config.discord_token)
 client.on('clientReady', () => {
@@ -35,9 +34,12 @@ client.on('messageCreate', async (message) => {
   if (message.author.id === client.user.id) return
   if (message.guild == null) return
 
-  await ingestMessage(db, message)
+  const entry = await processMesssage(message)
+  db.update(({ messages }) => {
+    messages.push(entry)
+  })
 
-  if (Math.random() < 1 / config.message_chance || (message.mentions.has(client.user) && message.member.roles.cache.has('1151660660560764938'))) {
+  if (Math.random() < 1 / config.message_chance || (message.mentions.has(client.user))) {
     try {
       await message.channel.sendTyping()
       const text = generateMessage(db)
@@ -57,13 +59,19 @@ client.on('messageCreate', async (message) => {
     }
   }
 
+  writeFileSync('readable.log', readableHistory(db.data.messages), 'utf8')
+
   if (db.data.messages.length > config.max_history) {
     memorise(db)
   }
 })
 
 client.on('messageUpdate', async (oldMessage, newMessage) => {
-  updateMessage(db, newMessage)
+  const entry = await processMesssage(newMessage)
+  db.update(({ messages }) => {
+    const index = messages.findIndex(({ id }) => id === oldMessage.id)
+    if (index !== -1) messages[index] = entry
+  })
 })
 
 client.on('messageReactionAdd', async (reaction, user) => {

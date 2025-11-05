@@ -20,7 +20,7 @@ const safetySettings = [
 
 const ai = new GoogleGenAI({ apiKey: config.gemini_token })
 
-function readableHistory (messages) {
+export function readableHistory (messages) {
   let out = '[MESSAGES]\n'
   for (const message of messages) {
     out += `#${message.channel}\n`
@@ -29,7 +29,12 @@ function readableHistory (messages) {
     }
     out += `[${message.author}] ${message.created}\n`
     out += `${message.message}\n`
-    if (message.attachments?.length > 0) out += `${JSON.stringify(message.attachments)}\n`
+    for (const attachment of message.attachments) {
+      out += `[ATTACHMENT] ${attachment}`
+    }
+    for (const embed of message.embeds) {
+      out += `[EMBED]\n${embed}\n`
+    }
     if (message.reactions.length > 0) {
       let reactStr = message.reactions.map(({ user, emoji }) => `@${user}: ${emoji}`)
       reactStr = reactStr.join(', ')

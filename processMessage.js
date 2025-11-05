@@ -33,35 +33,33 @@ function cleanContent (message) {
   return content
 }
 
-/**
- * @param {import('lowdb').LowSync} db
- * @param {import('discord.js').Message} message
- */
-export async function ingestMessage (db, message) {
-  db.update(({ messages }) => {
-    messages.push({
-      id: message.id,
-      channel: message.channel.name,
-      author: message.member.nickname ?? message.author.displayName,
-      created: formatDate(message.createdAt),
-      message: cleanContent(message),
-      attachments: [],
-      embeds: [],
-      reactions: []
-    })
-  })
+/** @param {import('discord.js').Message} message */
+export async function processMesssage (message) {
+  const entry = {
+    id: message.id,
+    channel: message.channel.name,
+    author: message.member.nickname ?? message.author.displayName,
+    created: formatDate(message.createdAt),
+    message: cleanContent(message),
+    attachments: [],
+    embeds: [],
+    reactions: []
+  }
 
   if (message.reference != null) {
     const reply = await message.fetchReference()
-    db.update(({ messages }) => {
-      const entry = messages.find(({ id }) => id === message.id)
-      if (entry != null) {
-        entry.reply_to = {
-          author: reply.member.nickname ?? reply.author.displayName,
-          message: truncate(cleanContent(reply))
-        }
-      }
-    })
+    entry.reply_to = {
+      author: reply.member.nickname ?? reply.author.displayName,
+      message: truncate(cleanContent(reply))
+    }
+  }
+
+  for (const react of message.reactions.cache.values()) {
+    for (const user of react.users.cache.values()) {
+      const member = await message.guild.members.fetch(user)
+      const name = member.nickname ?? user.displayName
+      entry.reactions.push({ user: name, emoji: String(react.emoji) })
+    }
   }
 
   for (const attachment of message.attachments.values()) {
@@ -71,13 +69,7 @@ export async function ingestMessage (db, message) {
       const base64 = Buffer.from(response.data).toString('base64')
       desc = await describe('image', attachment.contentType, base64)
     }
-    await message.channel.send(`\`Length: ${desc.length}\`\n${desc}`)
-    db.update(({ messages }) => {
-      const entry = messages.find(({ id }) => id === message.id)
-      if (entry != null) {
-        entry.attachments.push(desc)
-      }
-    })
+    entry.attachments.push(desc)
   }
 
   if ((/https?:\/\//).test(message.content)) {
@@ -120,18 +112,9 @@ export async function ingestMessage (db, message) {
         block.push(`[VIDEO] ${desc}`)
       }
 
-      const m = block.filter(i => i != null).join('\n')
-      await message.channel.send(`\`Length: ${m.length}\`\n${m}`)
-      db.update(({ messages }) => {
-        const entry = messages.find(({ id }) => id === message.id)
-        if (entry != null) {
-          entry.embeds.push(block.filter(i => i != null).join('\n'))
-        }
-      })
+      entry.embeds.push(block.filter(i => i != null).join('\n'))
     }
   }
-}
 
-export async function updateMessage (db, message) {
-
+  return entry
 }
