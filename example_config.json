@@ -1,4 +1,10 @@
 {
     "discord_token": "",
-    "gemini_token": ""
+    "gemini_token": "",
+    "talk_role": "",
+    "test_guild": "",
+    "truncate_length": 50,
+    "max_history": 2000,
+    "min_history": 1000,
+    "message_chance": 400
 }

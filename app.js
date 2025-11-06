@@ -33,16 +33,20 @@ client.on('clientReady', () => {
 client.on('messageCreate', async (message) => {
   if (message.author.id === client.user.id) return
   if (message.guild == null) return
+  if (message.guild.id === config.test_guild) return
 
   const entry = await processMesssage(message)
   db.update(({ messages }) => {
     messages.push(entry)
   })
 
-  if (Math.random() < 1 / config.message_chance || (message.mentions.has(client.user))) {
+  if (
+    Math.random() < 1 / config.message_chance ||
+    (message.mentions.has(client.user) && message.member.roles.cache.has(config.talk_role))
+  ) {
     try {
       await message.channel.sendTyping()
-      const text = generateMessage(db)
+      const text = await generateMessage(db)
       const botMessage = await message.channel.send(text)
       db.update(({ messages }) => {
         messages.push({
@@ -51,6 +55,8 @@ client.on('messageCreate', async (message) => {
           author: botMessage.author.displayName,
           created: formatDate(botMessage.createdAt),
           message: text,
+          attachments: [],
+          embeds: [],
           reactions: []
         })
       })
