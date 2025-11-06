@@ -10,20 +10,16 @@ MEMORY COMPRESSION PROTOCOL // THEORY-CHAN // REVISION M2 (HIGH-CAPACITY)
 1. **TOPIC THREAD MAP**
    - Full arc of active discussions (start → pivot → current).
 
-2. **MOOD & TONE LOG**
-   - Moment-to-moment shifts: chill → ironic → heated → dead → schizo.
-   - Trigger events (e.g., “@user drops based take → 12 reacts → mood spike”).
-
-3. **KEY MOMENTS / QUOTABLES**
+2. **KEY MOMENTS / QUOTABLES**
    - Exact quotes (preserve spelling, caps, punctuation).
    - New copypastas, image macros.
 
-4. **USER TIER DYNAMICS**
+3. **USER TIER DYNAMICS**
    - **Tier 1 (Core):** Usernames + current stance, running gags, emoji usage.
    - **Tier 2 (Mid):** Username + one-liner summary of input.
    - **Tier 3 (Noise):** Username + spam pattern + ignore/ratio status.
 
-5. **REFERENCES & LORE BANK**
+4. **REFERENCES & LORE BANK**
    - Custom emojis: `<:name:id>` — list all used + context.
    - Recurring phrases, in-jokes, callbacks to past arcs.
    - “Canon” events now referenceable.
@@ -47,7 +43,7 @@ MEMORY COMPRESSION PROTOCOL // THEORY-CHAN // REVISION M2 (HIGH-CAPACITY)
 
 **OUTPUT FORMAT (STRUCTURED PLAIN TEXT)**
 ```
-[MEMORY BLOCK vX]  // auto-increment per update
+[MEMORY BLOCK vX] // auto-increment per update
 → Main: [topic] // triggered by @user
 [quote or event]
   → pivot: [new angle] // @user
@@ -55,14 +51,8 @@ MEMORY COMPRESSION PROTOCOL // THEORY-CHAN // REVISION M2 (HIGH-CAPACITY)
 → Side: [sub-thread] // low engagement
 → Derail: [T3 spam] → ignored
 
-[MOOD ARC]
-chill (0-5) → ironic dunking → heated @user
- vs @user
- → cooldown[KEY MOMENTS]
-@T1
-: "exact quote" <:emoji:123>
-@T3
-: spam
+[KEY MOMENTS]
+@T1 : "exact quote" <:emoji:123>
+@T3 : schizo ramblings / inane personal drama
 new copypasta: [first 2 lines...][USER TIERS]
-<:emoji:12345> = midwit filter
-
+<:emoji:12345> = context

@@ -114,6 +114,7 @@ export async function memorise (db) {
       console.log('Memorise:', response.usageMetadata)
       writeFileSync(`memory_history/${(new Date()).getTime()}.txt`, memory, 'utf8')
       writeFileSync('prompts/memory.txt', response.text, 'utf8')
+      return
     } catch (error) {
       if (error.status === 429) {
         console.log(`Rate limit on ${model} for memory generation . . `)
