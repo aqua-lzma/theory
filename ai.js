@@ -1,8 +1,11 @@
 import { readFileSync, writeFileSync } from 'fs'
+import { createHash } from 'crypto'
+
 import { GoogleGenAI } from '@google/genai'
+import { JSONFileSyncPreset } from 'lowdb/node'
 
 const config = JSON.parse(readFileSync('config.json'))
-
+const descdb = new JSONFileSyncPreset('descdb.json', {})
 const models = [
   'gemini-2.5-pro',
   'gemini-2.5-flash',
@@ -20,17 +23,28 @@ const safetySettings = [
 
 const ai = new GoogleGenAI({ apiKey: config.gemini_token })
 
+function formatDate (date) {
+  date = new Date(date)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  const minute = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hour}:${minute}`
+}
+
 export function readableHistory (messages) {
+  messages.sort((a, b) => new Date(a.created) - new Date(b.created))
   let out = '[MESSAGES]\n'
   for (const message of messages) {
     out += `#${message.channel}\n`
     if (message.reply_to != null) {
-      out += `[REPLY @${message.reply_to.author}] "${message.reply_to.message}":\n`
+      out += `[REPLY @${message.reply_to.author}] ${message.reply_to.message}:\n`
     }
-    out += `[${message.author}] ${message.created}\n`
+    out += `[${message.author}] ${formatDate(message.created)}\n`
     out += `${message.message}\n`
     for (const attachment of message.attachments) {
-      out += `[ATTACHMENT] ${attachment}`
+      out += `[ATTACHMENT] ${attachment}\n`
     }
     for (const embed of message.embeds) {
       out += `[EMBED]\n${embed}\n`
@@ -111,6 +125,11 @@ export async function memorise (db) {
 }
 
 export async function describe (type, mimeType, data) {
+  const hash = createHash('sha256').update(data).digest('base64')
+  if (hash in descdb.data) {
+    console.log('Cached describe')
+    return descdb.data[hash]
+  }
   while (true) {
     try {
       const response = await ai.models.generateContent({
@@ -125,8 +144,10 @@ export async function describe (type, mimeType, data) {
           { text: `Concisely summarise this ${type} in a 3 sentences.` }
         ]
       })
-      console.log('Describe:', JSON.stringify(response.usageMetadata))
-      return response.text.replace(/\n/g, ' ')
+      console.log('Describe:', response.usageMetadata)
+      const text = response.text.replace(/\n/g, ' ')
+      descdb.update(db => { db[hash] = text })
+      return text
     } catch (error) {
       if (error.status === 429) {
         console.log('Rate limit on describe . . .')

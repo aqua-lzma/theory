@@ -5,7 +5,6 @@ import { JSONFileSyncPreset } from 'lowdb/node'
 
 import { processMesssage } from './processMessage.js'
 import { readableHistory, generateMessage, memorise } from './ai.js'
-import { formatDate } from './utils.js'
 
 const config = JSON.parse(readFileSync('config.json'))
 const client = new Client({
@@ -39,11 +38,13 @@ client.on('messageCreate', async (message) => {
   db.update(({ messages }) => {
     messages.push(entry)
   })
+  console.log(`- ${db.data.messages.length}`)
 
-  if (
-    Math.random() < 1 / config.message_chance ||
-    (message.mentions.has(client.user) && message.member.roles.cache.has(config.talk_role))
-  ) {
+  if (Math.random() < 1 / config.message_chance || (
+    message.mentions.has(client.user) &&
+    message.member.roles.cache.has(config.talk_role) &&
+    message.channel.id === config.talk_channel
+  )) {
     try {
       await message.channel.sendTyping()
       const text = await generateMessage(db)
@@ -52,8 +53,8 @@ client.on('messageCreate', async (message) => {
         messages.push({
           id: botMessage.id,
           channel: botMessage.channel.name,
-          author: botMessage.author.displayName,
-          created: formatDate(botMessage.createdAt),
+          author: botMessage.member?.nickname ?? botMessage.author.displayName,
+          created: botMessage.createdAt,
           message: text,
           attachments: [],
           embeds: [],
@@ -67,7 +68,7 @@ client.on('messageCreate', async (message) => {
 
   writeFileSync('readable.log', readableHistory(db.data.messages), 'utf8')
 
-  if (db.data.messages.length > config.max_history) {
+  if ((await db.read()).messages.length > config.max_history) {
     memorise(db)
   }
 })

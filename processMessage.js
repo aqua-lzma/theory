@@ -1,7 +1,10 @@
+import { readFileSync } from 'fs'
+
 import axios from 'axios'
 
 import { describe } from './ai.js'
-import { formatDate, truncate } from './utils.js'
+
+const config = JSON.parse(readFileSync('./config.json', 'utf8'))
 
 const imageFormats = ['image/png', 'image/jpg', 'image/jpeg', 'image/webp']
 const videoFormats = [
@@ -15,13 +18,21 @@ const videoFormats = [
   'video/wmv',
   'video/3gpp'
 ]
+const audioFormats = [
+  'audio/wav',
+  'audio/mp3',
+  'audio/aiff',
+  'audio/aac',
+  'audio/ogg',
+  'audio/flac'
+]
 
 /** @param {import('discord.js').Message} message */
 function cleanContent (message) {
   let content = message.content
   ;(message.mentions.users ?? []).forEach(user => {
     const member = message.guild.members.cache.get(user.id)
-    const displayName = member.nickname ?? user.displayName
+    const displayName = member?.nickname ?? user.displayName
     content = content.replace(new RegExp(`<@${user.id}>`, 'g'), `@${displayName}`)
   })
   ;(message.mentions.roles ?? []).forEach(role => {
@@ -33,13 +44,20 @@ function cleanContent (message) {
   return content
 }
 
+function truncate (message, length = config.truncate_length) {
+  if (message.length > length) {
+    return `${message.slice(0, length - 3)}...`
+  }
+  return message
+}
+
 /** @param {import('discord.js').Message} message */
 export async function processMesssage (message) {
   const entry = {
     id: message.id,
     channel: message.channel.name,
-    author: message.member.nickname ?? message.author.displayName,
-    created: formatDate(message.createdAt),
+    author: message.member?.nickname ?? message.author.displayName,
+    created: message.createdAt,
     message: cleanContent(message),
     attachments: [],
     embeds: [],
@@ -49,7 +67,7 @@ export async function processMesssage (message) {
   if (message.reference != null) {
     const reply = await message.fetchReference()
     entry.reply_to = {
-      author: reply.member.nickname ?? reply.author.displayName,
+      author: reply.member?.nickname ?? reply.author.displayName,
       message: truncate(cleanContent(reply))
     }
   }
@@ -57,7 +75,7 @@ export async function processMesssage (message) {
   for (const react of message.reactions.cache.values()) {
     for (const user of react.users.cache.values()) {
       const member = await message.guild.members.fetch(user)
-      const name = member.nickname ?? user.displayName
+      const name = member?.nickname ?? user.displayName
       entry.reactions.push({ user: name, emoji: String(react.emoji) })
     }
   }
@@ -68,6 +86,16 @@ export async function processMesssage (message) {
       const response = await axios.get(attachment.attachment, { responseType: 'arraybuffer' })
       const base64 = Buffer.from(response.data).toString('base64')
       desc = await describe('image', attachment.contentType, base64)
+    }
+    if (videoFormats.includes(attachment.contentType)) {
+      const response = await axios.get(attachment.attachment, { responseType: 'arraybuffer' })
+      const base64 = Buffer.from(response.data).toString('base64')
+      desc = await describe('video and audio', attachment.contentType, base64)
+    }
+    if (audioFormats.includes(attachment.contentType)) {
+      const response = await axios.get(attachment.attachment, { responseType: 'arraybuffer' })
+      const base64 = Buffer.from(response.data).toString('base64')
+      desc = await describe('audio', attachment.contentType, base64)
     }
     entry.attachments.push(desc)
   }
