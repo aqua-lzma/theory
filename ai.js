@@ -1,27 +1,32 @@
+
 import { readFileSync, writeFileSync } from 'fs'
 import { createHash } from 'crypto'
 
-import { GoogleGenAI } from '@google/genai'
+import { OpenRouter } from '@openrouter/sdk'
 import { JSONFileSyncPreset } from 'lowdb/node'
 
 const config = JSON.parse(readFileSync('config.json'))
 const descdb = new JSONFileSyncPreset('descdb.json', {})
-const models = [
-  'gemini-2.5-pro',
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite'
+
+const textModels = [
+  'tngtech/deepseek-r1t2-chimera:free'
 ]
-const prompt = readFileSync('prompts/prompt.txt', 'utf8')
-const memoryPrompt = readFileSync('prompts/memoryPrompt.txt', 'utf8')
-const safetySettings = [
-  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'OFF' },
-  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'OFF' },
-  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'OFF' },
-  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'OFF' },
-  { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'OFF' }
+const memoryModels = [
+  'tngtech/deepseek-r1t2-chimera:free'
+]
+const descModels = [
+  'amazon/nova-2-lite-v1:free',
+  'google/gemma-3-27b-it:free',
+  'nvidia/nemotron-nano-12b-v2-vl:free'
 ]
 
-const ai = new GoogleGenAI({ apiKey: config.gemini_token })
+const prompt = readFileSync('prompts/prompt.txt', 'utf8')
+const memoryPrompt = readFileSync('prompts/memoryPrompt.txt', 'utf8')
+
+// Initialize OpenRouter client with your token (set config.openrouter_token)
+const openRouter = new OpenRouter({
+  apiKey: config.openrouter_token,
+})
 
 function formatDate (date) {
   date = new Date(date)
@@ -41,8 +46,9 @@ export function readableHistory (messages) {
     if (message.reply_to != null) {
       out += `[REPLY @${message.reply_to.author}] ${message.reply_to.message}:\n`
     }
-    out += `[${message.author}] ${formatDate(message.created)}\n`
-    out += `${message.message}\n`
+    out += `[${message.author}] ${formatDate(message.created)}`
+    if (message.deleted) out += ' [DELETED]'
+    out += `\n${message.message}\n`
     for (const attachment of message.attachments) {
       out += `[ATTACHMENT] ${attachment}\n`
     }
@@ -61,99 +67,90 @@ export function readableHistory (messages) {
 
 /** @param {import('lowdb').LowSync} db */
 export async function generateMessage (db) {
-  for (const model of models) {
-    try {
-      const memory = readFileSync('prompts/memory.txt', 'utf8')
-      const contents = readableHistory(db.data.messages)
-      const response = await ai.models.generateContent({
-        model,
-        config: {
-          systemInstruction: prompt + '\n' + memory,
-          safetySettings,
-          temperature: 0.9
-        },
-        contents
-      })
-      console.log('Generate:', response.usageMetadata)
-      return response.text
-    } catch (error) {
-      if (error.status === 429) {
-        console.log(`Rate limit on ${model} for message generation . . .`)
-        if (model === models.at(-1)) throw Error('Rate limited.')
-      } else {
-        throw error
-      }
-    }
-  }
+  const memory = readFileSync('prompts/memory.txt', 'utf8')
+  const contents = readableHistory(db.data.messages)
+
+  const response = await openRouter.chat.send({
+    models: textModels,
+    temperature: 0.9,
+    messages: [
+      { role: 'system', content: `${prompt}\n${memory}` },
+      { role: 'user',   content: contents }
+    ]
+  })
+
+  console.log('Generate', response.usage)
+  return response.choices[0].message.content.trim()
 }
 
 /** @param {import('lowdb').LowSync} db */
 export async function memorise (db) {
   const memory = readFileSync('prompts/memory.txt', 'utf8')
+
   let toMemorise, trimmed
   db.update(data => {
     toMemorise = data.messages.slice(0, data.messages.length - config.min_history)
-    trimmed = data.messages.slice(data.messages.length - config.min_history)
+    trimmed    = data.messages.slice(data.messages.length - config.min_history)
     data.messages = trimmed
   })
+
   const contents = readableHistory(toMemorise)
-  for (const model of models) {
-    // Dont make memory blocks using flash-lite, just try again later
-    if (model === models.at(-1)) {
-      return db.update(({ messages }) => { messages.unshift(...toMemorise) })
-    }
-    try {
-      const response = await ai.models.generateContent({
-        model,
-        config: {
-          systemInstruction: memoryPrompt + memory,
-          safetySettings
-        },
-        contents
-      })
-      console.log('Memorise:', response.usageMetadata)
-      writeFileSync(`memory_history/${(new Date()).getTime()}.txt`, memory, 'utf8')
-      writeFileSync('prompts/memory.txt', response.text, 'utf8')
-      return
-    } catch (error) {
-      if (error.status === 429) {
-        console.log(`Rate limit on ${model} for memory generation . . `)
-      } else {
-        throw (error)
-      }
-    }
+
+  try {
+    const response = await openRouter.chat.send({
+      models: memoryModels,
+      messages: [
+        { role: 'system', content: `${memoryPrompt}${memory}` },
+        { role: 'user',   content: contents }
+      ],
+    })
+
+    console.log('Memorise', response.usage)
+
+    writeFileSync(`memory_history/${(new Date()).getTime()}.txt`, memory, 'utf8')
+    writeFileSync('prompts/memory.txt', response.choices[0].message.content, 'utf8')
+    return
+  } catch (e) {
+    db.update(({ messages }) => { messages.unshift(...toMemorise) })
+    console.error('Failed to memorise:', e)
   }
 }
 
-export async function describe (type, mimeType, data) {
-  const hash = createHash('sha256').update(data).digest('base64')
+export async function describe (type, mimeType, base64) {
+  const hash = createHash('sha256').update(base64).digest('base64')
   if (hash in descdb.data) {
     console.log('Cached describe')
     return descdb.data[hash]
   }
-  while (true) {
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-lite',
-        config: {
-          maxOutputTokens: 200,
-          thinkingConfig: { thinkingBudget: 0 },
-          safetySettings
-        },
-        contents: [
-          { inlineData: { mimeType, data } },
-          { text: `Concisely summarise this ${type} in a 3 sentences.` }
-        ]
-      })
-      console.log('Describe:', response.usageMetadata)
-      const text = response.text.replace(/\n/g, ' ')
-      descdb.update(db => { db[hash] = text })
-      return text
-    } catch (error) {
-      if (error.status === 429) {
-        console.log('Rate limit on describe . . .')
-        await new Promise((resolve) => setTimeout(resolve, 5000))
-      } else throw error
-    }
+
+  try {
+    const content = [
+      { type: 'text', text: `Concisely summarise this ${type} in 3 sentences.` }
+    ]
+    if (type === 'image') content.push({
+      type: 'image_url',
+      imageUrl: { url: `data:${mimeType};base64,${base64}` }
+    })
+    if (type === 'video') content.push({
+      type: 'video_url',
+      videoUrl: { url: `data:${mimeType};base64,${base64}` }
+    })
+    if (type === 'audio') content.push({
+      type: 'input_audio',
+      inputAudio: { data: base64, format: mimeType.split('/')[1] }
+    })
+    const response = await openRouter.chat.send({
+      models: descModels,
+      max_tokens: 200,
+      messages: [{ role: 'user', content }]
+    })
+
+    console.log('Describe', response.usage)
+    const text = response.choices[0].message.content.trim().replace(/\n/g, ' ')
+    descdb.update(db => { db[hash] = text })
+    return text
+  } catch (error) {
+    console.log('Failed describing:', error)
+    return '[Error describing media]'
   }
 }

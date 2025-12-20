@@ -6,7 +6,7 @@ import { describe } from './ai.js'
 
 const config = JSON.parse(readFileSync('./config.json', 'utf8'))
 
-const imageFormats = ['image/png', 'image/jpg', 'image/jpeg', 'image/webp']
+const imageFormats = ['image/png', 'image/jpg', 'image/jpeg', 'image/webp', 'image/gif']
 const videoFormats = [
   'video/mp4',
   'video/mpeg',
@@ -90,7 +90,7 @@ export async function processMesssage (message) {
     if (videoFormats.includes(attachment.contentType)) {
       const response = await axios.get(attachment.attachment, { responseType: 'arraybuffer' })
       const base64 = Buffer.from(response.data).toString('base64')
-      desc = await describe('video and audio', attachment.contentType, base64)
+      desc = await describe('video', attachment.contentType, base64)
     }
     if (audioFormats.includes(attachment.contentType)) {
       const response = await axios.get(attachment.attachment, { responseType: 'arraybuffer' })
@@ -135,7 +135,7 @@ export async function processMesssage (message) {
         let desc = response.headers['content-type']
         if (videoFormats.includes(desc)) {
           const base64 = Buffer.from(response.data).toString('base64')
-          desc = await describe('video and audio', response.headers['content-type'], base64)
+          desc = await describe('video', response.headers['content-type'], base64)
         }
         block.push(`[VIDEO] ${desc}`)
       }

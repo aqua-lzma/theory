@@ -30,7 +30,6 @@ client.on('clientReady', () => {
 })
 
 client.on('messageCreate', async (message) => {
-  if (message.author.id === client.user.id) return
   if (message.guild == null) return
   if (message.guild.id === config.test_guild) return
 
@@ -41,26 +40,14 @@ client.on('messageCreate', async (message) => {
   console.log(`- ${db.data.messages.length}`)
 
   if (Math.random() < 1 / config.message_chance || (
-    message.mentions.has(client.user) &&
-    message.member.roles.cache.has(config.talk_role) &&
-    message.channel.id === config.talk_channel
+    message.mentions.has(client.user)
+    && message.member.roles.cache.has(config.talk_role)
+    // && message.channel.id === config.talk_channel
   )) {
     try {
       await message.channel.sendTyping()
       const text = await generateMessage(db)
-      const botMessage = await message.channel.send(text)
-      db.update(({ messages }) => {
-        messages.push({
-          id: botMessage.id,
-          channel: botMessage.channel.name,
-          author: botMessage.member?.nickname ?? botMessage.author.displayName,
-          created: botMessage.createdAt,
-          message: text,
-          attachments: [],
-          embeds: [],
-          reactions: []
-        })
-      })
+      await message.channel.send(text)
     } catch (e) {
       console.log('Failed to send response:', e)
     }
@@ -68,7 +55,8 @@ client.on('messageCreate', async (message) => {
 
   writeFileSync('readable.log', readableHistory(db.data.messages), 'utf8')
 
-  if ((await db.read()).messages.length > config.max_history) {
+  await db.read()
+  if (db.data.messages.length > config.max_history) {
     memorise(db)
   }
 })
