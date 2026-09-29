@@ -8,9 +8,10 @@ import { syncMessages } from './lib/scrape/backfill.js'
 import { attachChunk, syncChunks } from './lib/embed/chunk.js'
 import { attachEmbed, syncEmbeds } from './lib/embed/embed.js'
 import { attachRag } from './lib/rag.js'
+import { attachDescribe } from './lib/ai/describe.js'
 
-if (!process.env.DISCORD_TOKEN || !process.env.GUILD_ID) {
-  log.error('Set DISCORD_TOKEN and GUILD_ID in .env')
+if (!process.env.DISCORD_TOKEN || !process.env.GUILD_ID || !process.env.OPENROUTER_API_KEY) {
+  log.error('Set DISCORD_TOKEN, GUILD_ID and OPENROUTER_API_KEY in .env')
   process.exit(1)
 }
 
@@ -35,6 +36,7 @@ client.once(Events.ClientReady, async () => {
 
   const bus = new EventEmitter()
   attachMessages(client, bus)
+  attachDescribe(bus)
 
   try {
     await syncMessages(guild)
