@@ -1,17 +1,25 @@
 {
-  "name": "theory",
-  "version": "1.0.0",
-  "description": "Discord.js / Gemini GenAI chatbot",
-  "license": "WTFPL",
-  "author": "aqua-lzma",
+  "name": "theory3",
+  "version": "0.1.0",
   "type": "module",
-  "main": "app.js",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js",
+    "viz": "node viz/server.js",
+    "lint": "eslint ."
+  },
   "dependencies": {
-    "@openrouter/sdk": "^0.2.11",
-    "discord.js": "^14.24.2",
-    "lowdb": "^7.0.1"
+    "better-sqlite3": "^13.0.3",
+    "discord.js": "^14.27.0",
+    "dotenv": "^17.4.2"
   },
   "devDependencies": {
-    "standard": "^17.1.2"
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "eslint": "^10.10.0",
+    "eslint-plugin-import-x": "^4.17.1",
+    "eslint-plugin-n": "^18.3.0",
+    "eslint-plugin-promise": "^7.3.0",
+    "globals": "^17.12.0"
   }
 }
